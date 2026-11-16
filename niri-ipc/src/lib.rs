@@ -195,8 +195,15 @@ pub enum Action {
     /// Exit niri.
     Quit {
         /// Skip the "Press Enter to confirm" prompt.
+        #[serde(default)]
         #[cfg_attr(feature = "clap", arg(short, long))]
         skip_confirmation: bool,
+    },
+    /// Change the virtual terminal.
+    ChangeVt {
+        /// Virtual terminal to change to.
+        #[cfg_attr(feature = "clap", arg(required = true))]
+        vt: u8,
     },
     /// Power off all monitors via DPMS.
     PowerOffMonitors {},
@@ -223,6 +230,7 @@ pub enum Action {
     /// Open the screenshot UI.
     Screenshot {
         ///  Whether to show the mouse pointer by default in the screenshot UI.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(short = 'p', long, action = clap::ArgAction::Set, default_value_t = true))]
         show_pointer: bool,
 
@@ -239,10 +247,12 @@ pub enum Action {
         /// Write the screenshot to disk in addition to putting it in your clipboard.
         ///
         /// The screenshot is saved according to the `screenshot-path` config setting.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(short = 'd', long, action = clap::ArgAction::Set, default_value_t = true))]
         write_to_disk: bool,
 
         /// Whether to include the mouse pointer in the screenshot.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(short = 'p', long, action = clap::ArgAction::Set, default_value_t = true))]
         show_pointer: bool,
 
@@ -265,6 +275,7 @@ pub enum Action {
         /// Write the screenshot to disk in addition to putting it in your clipboard.
         ///
         /// The screenshot is saved according to the `screenshot-path` config setting.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(short = 'd', long, action = clap::ArgAction::Set, default_value_t = true))]
         write_to_disk: bool,
 
@@ -272,6 +283,7 @@ pub enum Action {
         ///
         /// The pointer will be included only if the window is currently receiving pointer input
         /// (usually this means the pointer is on top of the window).
+        #[serde(default)]
         #[cfg_attr(feature = "clap", arg(short = 'p', long, action = clap::ArgAction::Set, default_value_t = false))]
         show_pointer: bool,
 
@@ -313,6 +325,75 @@ pub enum Action {
     )]
     ToggleWindowedFullscreen {
         /// Id of the window to toggle windowed fullscreen of.
+        ///
+        /// If `None`, uses the focused window.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
+    },
+    /// Make a window fullscreen.
+    #[cfg_attr(feature = "clap", clap(about = "Make the focused window fullscreen"))]
+    SetWindowFullscreen {
+        /// Id of the window to make fullscreen.
+        ///
+        /// If `None`, uses the focused window.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
+    },
+    /// Take a window out of fullscreen.
+    #[cfg_attr(
+        feature = "clap",
+        clap(about = "Take the focused window out of fullscreen")
+    )]
+    UnsetWindowFullscreen {
+        /// Id of the window to take out of fullscreen.
+        ///
+        /// If `None`, uses the focused window.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
+    },
+    /// Maximize a window to the screen edges.
+    #[cfg_attr(
+        feature = "clap",
+        clap(about = "Maximize the focused window to the screen edges")
+    )]
+    SetWindowMaximizedToEdges {
+        /// Id of the window to maximize to edges.
+        ///
+        /// If `None`, uses the focused window.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
+    },
+    /// Unmaximize a window from the screen edges.
+    #[cfg_attr(
+        feature = "clap",
+        clap(about = "Unmaximize the focused window from the screen edges")
+    )]
+    UnsetWindowMaximizedToEdges {
+        /// Id of the window to unmaximize from edges.
+        ///
+        /// If `None`, uses the focused window.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
+    },
+    /// Enable windowed (fake) fullscreen on a window.
+    #[cfg_attr(
+        feature = "clap",
+        clap(about = "Enable windowed (fake) fullscreen on the focused window")
+    )]
+    SetWindowedFullscreen {
+        /// Id of the window to enable windowed fullscreen on.
+        ///
+        /// If `None`, uses the focused window.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
+    },
+    /// Disable windowed (fake) fullscreen on a window.
+    #[cfg_attr(
+        feature = "clap",
+        clap(about = "Disable windowed (fake) fullscreen on the focused window")
+    )]
+    UnsetWindowedFullscreen {
+        /// Id of the window to disable windowed fullscreen on.
         ///
         /// If `None`, uses the focused window.
         #[cfg_attr(feature = "clap", arg(long))]
@@ -492,6 +573,7 @@ pub enum Action {
         ///
         /// If `true` (the default), the focus will follow the window to the new workspace. If
         /// `false`, the focus will remain on the original workspace.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set, default_value_t = true))]
         focus: bool,
     },
@@ -501,6 +583,7 @@ pub enum Action {
         ///
         /// If `true` (the default), the focus will follow the window to the new workspace. If
         /// `false`, the focus will remain on the original workspace.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set, default_value_t = true))]
         focus: bool,
     },
@@ -525,6 +608,7 @@ pub enum Action {
         /// If `true` (the default) and the window to move is focused, the focus will follow the
         /// window to the new workspace. If `false`, the focus will remain on the original
         /// workspace.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set, default_value_t = true))]
         focus: bool,
     },
@@ -534,6 +618,7 @@ pub enum Action {
         ///
         /// If `true` (the default), the focus will follow the column to the new workspace. If
         /// `false`, the focus will remain on the original workspace.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set, default_value_t = true))]
         focus: bool,
     },
@@ -543,6 +628,7 @@ pub enum Action {
         ///
         /// If `true` (the default), the focus will follow the column to the new workspace. If
         /// `false`, the focus will remain on the original workspace.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set, default_value_t = true))]
         focus: bool,
     },
@@ -556,6 +642,7 @@ pub enum Action {
         ///
         /// If `true` (the default), the focus will follow the column to the new workspace. If
         /// `false`, the focus will remain on the original workspace.
+        #[serde(default = "default_true")]
         #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set, default_value_t = true))]
         focus: bool,
     },
@@ -853,6 +940,7 @@ pub enum Action {
         id: Option<u64>,
 
         /// How to change the X position.
+        #[serde(default = "default_position_change")]
         #[cfg_attr(
             feature = "clap",
             arg(short, long, default_value = "+0", allow_hyphen_values = true)
@@ -860,6 +948,7 @@ pub enum Action {
         x: PositionChange,
 
         /// How to change the Y position.
+        #[serde(default = "default_position_change")]
         #[cfg_attr(
             feature = "clap",
             arg(short, long, default_value = "+0", allow_hyphen_values = true)
@@ -1206,6 +1295,7 @@ pub struct VrrToSet {
     )]
     pub vrr: bool,
     /// Only enable when the output shows a window matching the variable-refresh-rate window rule.
+    #[serde(default)]
     #[cfg_attr(feature = "clap", arg(long))]
     pub on_demand: bool,
 }
@@ -1591,7 +1681,18 @@ pub enum CastKind {
     ///
     /// A client capturing both an output and the cursor creates two sessions, which are reported
     /// as two `Cast`s sharing one [`session_id`](Cast::session_id).
+    ///
+    /// A session is reported once it requests its second frame. Sessions requesting only one
+    /// frame are treated as regular screenshots (e.g. grim) and not reported as screencasts.
     ExtImageCopyCapture,
+    /// ext-image-copy-capture protocol cursor screencast.
+    ///
+    /// `Cast`s of this kind show the image of the cursor and cursor position. Their
+    /// [`target`](Cast::target) indicates the output or window that the cursor is captured over.
+    ///
+    /// Like [`ExtImageCopyCapture`](CastKind::ExtImageCopyCapture), reported once the session
+    /// requests its second frame.
+    ExtImageCopyCaptureCursor,
 }
 
 /// Target of a screencast.
@@ -1751,6 +1852,14 @@ pub enum Event {
     CastStopped {
         /// Stream ID of the stopped screencast.
         stream_id: u64,
+    },
+    /// Touchpad toggled on/off via [`Action::ToggleTouchpad`].
+    TouchpadToggled {
+        /// Whether the touchpad is now enabled.
+        ///
+        /// Note that this only indicates the [`Action::ToggleTouchpad`] state. The touchpad can be
+        /// disabled in hardware, or via `input { touchpad { off; } }`—this is not reflected here.
+        on: bool,
     },
 }
 
@@ -2110,6 +2219,14 @@ impl OutputAction {
             _ => Ok(()),
         }
     }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_position_change() -> PositionChange {
+    PositionChange::AdjustFixed(0.)
 }
 
 #[cfg(test)]

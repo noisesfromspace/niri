@@ -2463,18 +2463,45 @@ impl<W: LayoutElement> ScrollingSpace<W> {
     }
 
     pub fn tiles_with_ipc_layouts(&self) -> impl Iterator<Item = (&Tile<W>, WindowLayout)> {
+        let scale = self.scale;
+        let view = Rectangle::from_size(self.view_size);
+        // Use the stationary view offset, consistent with how moving floating windows doesn't spam
+        // the IPC in progress.
+        let view_pos = self.column_x(self.active_column_idx) + self.view_offset.stationary();
+
         self.columns
             .iter()
+            .zip(self.column_xs(self.data.iter().copied()))
             .enumerate()
-            .flat_map(move |(col_idx, col)| {
-                col.tiles().enumerate().map(move |(tile_idx, (tile, _))| {
-                    let layout = WindowLayout {
-                        // Our indices are 1-based, consistent with the actions.
-                        pos_in_scrolling_layout: Some((col_idx + 1, tile_idx + 1)),
-                        ..tile.ipc_layout_template()
-                    };
-                    (tile, layout)
-                })
+            .flat_map(move |(col_idx, (col, col_x))| {
+                // Do not include animated render offset here consistently with floating.
+                let col_off = Point::from((col_x - view_pos, 0.));
+
+                col.tiles()
+                    .enumerate()
+                    .map(move |(tile_idx, (tile, tile_off))| {
+                        // Do not include animated render offset here consistently with floating.
+                        let pos = col_off + tile_off;
+                        // Round to physical pixels.
+                        let pos = pos.to_physical_precise_round(scale).to_logical(scale);
+
+                        let mut layout = WindowLayout {
+                            // Our indices are 1-based, consistent with the actions.
+                            pos_in_scrolling_layout: Some((col_idx + 1, tile_idx + 1)),
+                            tile_pos_in_workspace_view: Some(pos.into()),
+                            ..tile.ipc_layout_template()
+                        };
+
+                        // Clear out tile_pos_in_workspace_view for tiles outside of the workspace
+                        // view to avoid IPC spam. E.g. so that any scrolling on a workspace with
+                        // 100 columns didn't have to send 100 window layout changes.
+                        let bbox = Rectangle::new(pos, Size::from(layout.tile_size));
+                        if bbox.intersection(view).is_none() {
+                            layout.tile_pos_in_workspace_view = None;
+                        }
+
+                        (tile, layout)
+                    })
             })
     }
 
@@ -2943,19 +2970,22 @@ impl<W: LayoutElement> ScrollingSpace<W> {
         true
     }
 
-    pub fn render_above_top_layer(&self) -> bool {
+    pub fn fullscreen_window_above_top_layer(&self) -> Option<&W> {
         // Render above the top layer if we're on a fullscreen window and the view is stationary.
         if self.columns.is_empty() {
-            return false;
+            return None;
         }
 
         if !self.view_offset.is_static() {
-            return false;
+            return None;
         }
 
-        self.columns[self.active_column_idx]
-            .sizing_mode()
-            .is_fullscreen()
+        let col = &self.columns[self.active_column_idx];
+        if !col.sizing_mode().is_fullscreen() {
+            return None;
+        }
+
+        Some(col.tiles[col.active_tile_idx].window())
     }
 
     pub fn render<R: NiriRenderer>(
@@ -2972,8 +3002,9 @@ impl<W: LayoutElement> ScrollingSpace<W> {
         if layer.is_normal() {
             let view_rect = Rectangle::new(Point::from((self.view_pos(), 0.)), self.view_size);
             for closing in self.closing_windows.iter().rev() {
-                let elem = closing.render(ctx.as_gles(), view_rect, scale);
-                push(elem.into());
+                if let Some(elem) = closing.render(ctx.as_gles(), view_rect, scale) {
+                    push(elem.into());
+                }
             }
         }
 
